@@ -18,6 +18,11 @@ import { secp256k1, schnorr } from "@noble/curves/secp256k1";
 import * as mod from "@noble/curves/abstract/modular";
 import * as utils from "@noble/curves/abstract/utils";
 
+interface XOnlyPointAddTweakResult {
+  parity: 1 | 0;
+  xOnlyPubkey: Uint8Array;
+}
+
 const Point = secp256k1.ProjectivePoint;
 
 const THROW_BAD_PRIVATE = "Expected Private";
@@ -43,11 +48,11 @@ const BN32_P_MINUS_N = new Uint8Array([
 ]);
 const _1n = BigInt(1);
 
-function isUint8Array(value) {
+function isUint8Array(value: any): value is Uint8Array {
   return value instanceof Uint8Array;
 }
 
-function cmpBN32(data1, data2) {
+function cmpBN32(data1: Uint8Array, data2: Uint8Array): number {
   for (let i = 0; i < 32; ++i) {
     if (data1[i] !== data2[i]) {
       return data1[i] < data2[i] ? -1 : 1;
@@ -56,11 +61,11 @@ function cmpBN32(data1, data2) {
   return 0;
 }
 
-function isZero(x) {
+function isZero(x: Uint8Array): boolean {
   return cmpBN32(x, BN32_ZERO) === 0;
 }
 
-function isTweak(tweak) {
+function isTweak(tweak: any): boolean {
   if (
     !(tweak instanceof Uint8Array) ||
     tweak.length !== TWEAK_SIZE ||
@@ -71,7 +76,7 @@ function isTweak(tweak) {
   return true;
 }
 
-function isSignature(signature) {
+function isSignature(signature: any): boolean {
   return (
     signature instanceof Uint8Array &&
     signature.length === 64 &&
@@ -80,7 +85,7 @@ function isSignature(signature) {
   );
 }
 
-function isSigrLessThanPMinusN(signature) {
+function isSigrLessThanPMinusN(signature: Uint8Array): boolean {
   return (
     isUint8Array(signature) &&
     signature.length === 64 &&
@@ -88,23 +93,23 @@ function isSigrLessThanPMinusN(signature) {
   );
 }
 
-function isSignatureNonzeroRS(signature) {
+function isSignatureNonzeroRS(signature: Uint8Array): boolean {
   return !(
     isZero(signature.subarray(0, 32)) || isZero(signature.subarray(32, 64))
   );
 }
 
-function isHash(h) {
+function isHash(h: any): boolean {
   return h instanceof Uint8Array && h.length === HASH_SIZE;
 }
 
-function isExtraData(e) {
+function isExtraData(e: any): boolean {
   return (
     e === undefined || (e instanceof Uint8Array && e.length === EXTRA_DATA_SIZE)
   );
 }
 
-function normalizeScalar(scalar) {
+function normalizeScalar(scalar: any) {
   let num;
   if (typeof scalar === "bigint") {
     num = scalar;
@@ -129,31 +134,35 @@ function normalizeScalar(scalar) {
   return num;
 }
 
-function normalizePrivateKey(privateKey) {
+function normalizePrivateKey(privateKey: Uint8Array) {
   return secp256k1.utils.normPrivateKeyToScalar(privateKey);
 }
 
-function _privateAdd(privateKey, tweak) {
+function _privateAdd(privateKey: Uint8Array, tweak: Uint8Array) {
   const p = normalizePrivateKey(privateKey);
   const t = normalizeScalar(tweak);
   const add = utils.numberToBytesBE(mod.mod(p + t, secp256k1.CURVE.n), 32);
   return secp256k1.utils.isValidPrivateKey(add) ? add : null;
 }
 
-function _privateSub(privateKey, tweak) {
+function _privateSub(privateKey: Uint8Array, tweak: Uint8Array) {
   const p = normalizePrivateKey(privateKey);
   const t = normalizeScalar(tweak);
   const sub = utils.numberToBytesBE(mod.mod(p - t, secp256k1.CURVE.n), 32);
   return secp256k1.utils.isValidPrivateKey(sub) ? sub : null;
 }
 
-function _privateNegate(privateKey) {
+function _privateNegate(privateKey: Uint8Array) {
   const p = normalizePrivateKey(privateKey);
   const not = utils.numberToBytesBE(secp256k1.CURVE.n - p, 32);
   return secp256k1.utils.isValidPrivateKey(not) ? not : null;
 }
 
-function _pointAddScalar(p, tweak, isCompressed) {
+function _pointAddScalar(
+  p: Uint8Array,
+  tweak: Uint8Array,
+  isCompressed: boolean
+) {
   const P = fromHex(p);
   const t = normalizeScalar(tweak);
   // multiplyAndAddUnsafe(P, scalar, 1) = P + scalar*G
@@ -162,21 +171,25 @@ function _pointAddScalar(p, tweak, isCompressed) {
   return Q.toRawBytes(isCompressed);
 }
 
-function _pointMultiply(p, tweak, isCompressed) {
+function _pointMultiply(
+  p: Uint8Array,
+  tweak: Uint8Array,
+  isCompressed: boolean
+) {
   const P = fromHex(p);
   const h = typeof tweak === "string" ? tweak : utils.bytesToHex(tweak);
   const t = utils.hexToNumber(h);
   return P.multiply(t).toRawBytes(isCompressed);
 }
 
-function assumeCompression(compressed, p) {
+function assumeCompression(compressed?: boolean, p?: Uint8Array) {
   if (compressed === undefined) {
     return p !== undefined ? isPointCompressed(p) : true;
   }
   return !!compressed;
 }
 
-function throwToNull(fn) {
+function throwToNull<T>(fn: () => T): T | null {
   try {
     return fn();
   } catch (e) {
@@ -184,15 +197,15 @@ function throwToNull(fn) {
   }
 }
 
-function fromXOnly(bytes) {
+function fromXOnly(bytes: Uint8Array) {
   return schnorr.utils.lift_x(utils.bytesToNumberBE(bytes));
 }
 
-function fromHex(bytes) {
+function fromHex(bytes: Uint8Array) {
   return bytes.length === 32 ? fromXOnly(bytes) : Point.fromHex(bytes);
 }
 
-function _isPoint(p, xOnly) {
+function _isPoint(p: Uint8Array, xOnly: boolean) {
   if ((p.length === 32) !== xOnly) return false;
   try {
     if (xOnly) return !!fromXOnly(p);
@@ -202,24 +215,27 @@ function _isPoint(p, xOnly) {
   }
 }
 
-export function isPoint(p) {
+export function isPoint(p: Uint8Array): boolean {
   return _isPoint(p, false);
 }
 
-export function isPointCompressed(p) {
+export function isPointCompressed(p: Uint8Array): boolean {
   const PUBLIC_KEY_COMPRESSED_SIZE = 33;
   return _isPoint(p, false) && p.length === PUBLIC_KEY_COMPRESSED_SIZE;
 }
 
-export function isPrivate(d) {
+export function isPrivate(d: Uint8Array): boolean {
   return secp256k1.utils.isValidPrivateKey(d);
 }
 
-export function isXOnlyPoint(p) {
+export function isXOnlyPoint(p: Uint8Array): boolean {
   return _isPoint(p, true);
 }
 
-export function xOnlyPointAddTweak(p, tweak) {
+export function xOnlyPointAddTweak(
+  p: Uint8Array,
+  tweak: Uint8Array
+): XOnlyPointAddTweakResult | null {
   if (!isXOnlyPoint(p)) {
     throw new Error(THROW_BAD_POINT);
   }
@@ -233,37 +249,50 @@ export function xOnlyPointAddTweak(p, tweak) {
   });
 }
 
-export function xOnlyPointFromPoint(p) {
+export function xOnlyPointFromPoint(p: Uint8Array): Uint8Array {
   if (!isPoint(p)) {
     throw new Error(THROW_BAD_POINT);
   }
   return p.slice(1, 33);
 }
 
-export function pointFromScalar(sk, compressed) {
+export function pointFromScalar(
+  sk: Uint8Array,
+  compressed?: boolean
+): Uint8Array | null {
   if (!isPrivate(sk)) {
     throw new Error(THROW_BAD_PRIVATE);
   }
   return throwToNull(() =>
-    secp256k1.getPublicKey(sk, assumeCompression(compressed)),
+    secp256k1.getPublicKey(sk, assumeCompression(compressed))
   );
 }
 
-export function xOnlyPointFromScalar(d) {
+export function xOnlyPointFromScalar(d: Uint8Array): Uint8Array {
   if (!isPrivate(d)) {
     throw new Error(THROW_BAD_PRIVATE);
   }
-  return xOnlyPointFromPoint(pointFromScalar(d));
+
+  const point = pointFromScalar(d);
+  if (!point) {
+    throw new Error(THROW_BAD_POINT);
+  }
+
+  return xOnlyPointFromPoint(point);
 }
 
-export function pointCompress(p, compressed) {
+export function pointCompress(p: Uint8Array, compressed?: boolean): Uint8Array {
   if (!isPoint(p)) {
     throw new Error(THROW_BAD_POINT);
   }
   return fromHex(p).toRawBytes(assumeCompression(compressed, p));
 }
 
-export function pointMultiply(a, tweak, compressed) {
+export function pointMultiply(
+  a: Uint8Array,
+  tweak: Uint8Array,
+  compressed?: boolean
+): Uint8Array | null {
   if (!isPoint(a)) {
     throw new Error(THROW_BAD_POINT);
   }
@@ -271,11 +300,15 @@ export function pointMultiply(a, tweak, compressed) {
     throw new Error(THROW_BAD_TWEAK);
   }
   return throwToNull(() =>
-    _pointMultiply(a, tweak, assumeCompression(compressed, a)),
+    _pointMultiply(a, tweak, assumeCompression(compressed, a))
   );
 }
 
-export function pointAdd(a, b, compressed) {
+export function pointAdd(
+  a: Uint8Array,
+  b: Uint8Array,
+  compressed?: boolean
+): Uint8Array | null {
   if (!isPoint(a) || !isPoint(b)) {
     throw new Error(THROW_BAD_POINT);
   }
@@ -290,7 +323,11 @@ export function pointAdd(a, b, compressed) {
   });
 }
 
-export function pointAddScalar(p, tweak, compressed) {
+export function pointAddScalar(
+  p: Uint8Array,
+  tweak: Uint8Array,
+  compressed?: boolean
+): Uint8Array | null {
   if (!isPoint(p)) {
     throw new Error(THROW_BAD_POINT);
   }
@@ -298,11 +335,14 @@ export function pointAddScalar(p, tweak, compressed) {
     throw new Error(THROW_BAD_TWEAK);
   }
   return throwToNull(() =>
-    _pointAddScalar(p, tweak, assumeCompression(compressed, p)),
+    _pointAddScalar(p, tweak, assumeCompression(compressed, p))
   );
 }
 
-export function privateAdd(d, tweak) {
+export function privateAdd(
+  d: Uint8Array,
+  tweak: Uint8Array
+): Uint8Array | null {
   if (!isPrivate(d)) {
     throw new Error(THROW_BAD_PRIVATE);
   }
@@ -312,7 +352,10 @@ export function privateAdd(d, tweak) {
   return throwToNull(() => _privateAdd(d, tweak));
 }
 
-export function privateSub(d, tweak) {
+export function privateSub(
+  d: Uint8Array,
+  tweak: Uint8Array
+): Uint8Array | null {
   if (!isPrivate(d)) {
     throw new Error(THROW_BAD_PRIVATE);
   }
@@ -322,14 +365,19 @@ export function privateSub(d, tweak) {
   return throwToNull(() => _privateSub(d, tweak));
 }
 
-export function privateNegate(d) {
+export function privateNegate(d: Uint8Array): Uint8Array {
   if (!isPrivate(d)) {
     throw new Error(THROW_BAD_PRIVATE);
   }
-  return _privateNegate(d);
+  const result = _privateNegate(d);
+  if (!result) {
+    throw new Error(THROW_BAD_PRIVATE);
+  }
+
+  return result;
 }
 
-export function sign(h, d, e) {
+export function sign(h: Uint8Array, d: Uint8Array, e?: Uint8Array): Uint8Array {
   if (!isPrivate(d)) {
     throw new Error(THROW_BAD_PRIVATE);
   }
@@ -342,7 +390,11 @@ export function sign(h, d, e) {
   return secp256k1.sign(h, d, { extraEntropy: e }).toCompactRawBytes();
 }
 
-export function signRecoverable(h, d, e) {
+export function signRecoverable(
+  h: Uint8Array,
+  d: Uint8Array,
+  e?: Uint8Array
+): { signature: Uint8Array; recoveryId: number } {
   if (!isPrivate(d)) {
     throw new Error(THROW_BAD_PRIVATE);
   }
@@ -359,7 +411,11 @@ export function signRecoverable(h, d, e) {
   };
 }
 
-export function signSchnorr(h, d, e) {
+export function signSchnorr(
+  h: Uint8Array,
+  d: Uint8Array,
+  e?: Uint8Array
+): Uint8Array {
   if (!isPrivate(d)) {
     throw new Error(THROW_BAD_PRIVATE);
   }
@@ -372,7 +428,12 @@ export function signSchnorr(h, d, e) {
   return schnorr.sign(h, d, e);
 }
 
-export function recover(h, signature, recoveryId, compressed) {
+export function recover(
+  h: Uint8Array,
+  signature: Uint8Array,
+  recoveryId: number,
+  compressed?: boolean
+): Uint8Array | null {
   if (!isHash(h)) {
     throw new Error(THROW_BAD_HASH);
   }
@@ -396,7 +457,12 @@ export function recover(h, signature, recoveryId, compressed) {
   return Q.toRawBytes(assumeCompression(compressed));
 }
 
-export function verify(h, Q, signature, strict) {
+export function verify(
+  h: Uint8Array,
+  Q: Uint8Array,
+  signature: Uint8Array,
+  strict?: boolean
+): boolean {
   if (!isPoint(Q)) {
     throw new Error(THROW_BAD_POINT);
   }
@@ -409,7 +475,11 @@ export function verify(h, Q, signature, strict) {
   return secp256k1.verify(signature, h, Q, { lowS: strict });
 }
 
-export function verifySchnorr(h, Q, signature) {
+export function verifySchnorr(
+  h: Uint8Array,
+  Q: Uint8Array,
+  signature: Uint8Array
+): boolean {
   if (!isXOnlyPoint(Q)) {
     throw new Error(THROW_BAD_POINT);
   }

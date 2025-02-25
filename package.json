@@ -33,10 +33,13 @@
   "devDependencies": {
     "@babel/node": "^7.20.7",
     "@babel/plugin-transform-modules-commonjs": "^7.20.11",
-    "bip32": "^3.1.0",
+    "@rollup/plugin-node-resolve": "^16.0.0",
+    "bip32": "^4.0.0",
+    "bitcoinjs-lib": "^6.1.7",
     "ecpair": "^2.1.0",
     "rollup": "^3.9.1",
     "rollup-plugin-commonjs": "^10.1.0",
+    "rollup-plugin-typescript2": "^0.36.0",
     "tap-summary": "^4.0.0",
     "tape": "^5.6.1"
   },
